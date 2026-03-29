@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import confetti from "canvas-confetti";
 
 const FEATURES = [
   {
@@ -120,6 +121,141 @@ function useInView(threshold = 0.15) {
   return { ref, inView };
 }
 
+function TemplateModal({ onClose }: { onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const command = "npx redauth my-new-app";
+
+  useEffect(() => {
+    const canvas = document.createElement("canvas");
+    canvas.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;pointer-events:none;";
+    document.body.appendChild(canvas);
+    const fire = confetti.create(canvas, { resize: true, useWorker: false });
+
+    fire({ particleCount: 180, spread: 90, origin: { y: 0.35 }, colors: ["#fe9ec7", "#89d4ff", "#f9f6c4", "#44acff", "#ffffff", "#ff7b72"] });
+    const t = setTimeout(() => {
+      fire({ particleCount: 80, spread: 60, origin: { x: 0.2, y: 0.45 }, colors: ["#fe9ec7", "#89d4ff", "#f9f6c4"] });
+      fire({ particleCount: 80, spread: 60, origin: { x: 0.8, y: 0.45 }, colors: ["#44acff", "#ffffff", "#ff7b72"] });
+    }, 250);
+
+    return () => { clearTimeout(t); document.body.removeChild(canvas); };
+  }, []);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(command);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      style={{ backdropFilter: "blur(2px)" }}
+    >
+      <div
+        className="b-card anim-modal-in"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: 500,
+          width: "100%",
+          padding: "40px 36px",
+          position: "relative",
+          background: "white",
+          zIndex: 1001,
+        }}
+      >
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 14,
+            right: 14,
+            background: "none",
+            border: "2px solid var(--black)",
+            width: 34,
+            height: 34,
+            cursor: "pointer",
+            fontFamily: "Space Grotesk",
+            fontWeight: 700,
+            fontSize: 15,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "2px 2px 0 var(--black)",
+          }}
+        >
+          ✕
+        </button>
+
+        <div style={{ marginBottom: 6 }}>
+          <span className="b-tag" style={{ background: "var(--sky)", fontSize: 11 }}>
+            <span style={{ color: "var(--black)" }}>◆</span>
+            npm library
+          </span>
+        </div>
+
+        <h3 style={{
+          fontFamily: "Space Grotesk",
+          fontWeight: 800,
+          fontSize: 26,
+          marginBottom: 10,
+          letterSpacing: "-0.02em",
+        }}>
+          Use Template
+        </h3>
+        <p style={{ color: "#555", fontSize: 15, marginBottom: 28, lineHeight: 1.65 }}>
+          Run this command in your terminal to scaffold the full authentication backend instantly:
+        </p>
+
+        {/* Command block */}
+        <div style={{
+          background: "#0d1117",
+          border: "2px solid var(--black)",
+          boxShadow: "4px 4px 0 var(--black)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px 18px",
+          gap: 14,
+          marginBottom: 28,
+        }}>
+          <code style={{
+            fontFamily: "monospace",
+            fontSize: 14,
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            <span style={{ color: "#8b949e" }}>$ </span>
+            <span style={{ color: "#79c0ff" }}>npx</span>
+            <span style={{ color: "#e6edf3" }}> redauth </span>
+            <span style={{ color: "#a5d6ff" }}>my-new-app</span>
+          </code>
+          <button
+            onClick={handleCopy}
+            className="btn btn-sm"
+            style={{
+              background: copied ? "var(--sky)" : "var(--cream)",
+              flexShrink: 0,
+              fontSize: 12,
+              minWidth: 72,
+              transition: "background 0.15s ease",
+            }}
+          >
+            {copied ? "✓ Copied!" : "📋 Copy"}
+          </button>
+        </div>
+
+        <p style={{ color: "#888", fontSize: 13, lineHeight: 1.65 }}>
+          Scaffolds the complete RedAuth backend — auth routes, JWT, Redis, BullMQ, Prisma, and all middleware pre-wired. Replace <code style={{ background: "#f0f0f0", padding: "1px 5px", fontSize: 12 }}>my-new-app</code> with your project name.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -185,7 +321,7 @@ function Navbar() {
   );
 }
 
-function HeroSection() {
+function HeroSection({ onOpenModal }: { onOpenModal: () => void }) {
   const word = useTypewriter(WORDS);
 
   return (
@@ -248,11 +384,27 @@ function HeroSection() {
       }}>
         {/* Left: text */}
         <div style={{ minWidth: 0 }}>
-          {/* Badge */}
+          {/* Badge — dark code style */}
           <div className="anim-hidden anim-slide-down" style={{ marginBottom: 18 }}>
-            <span className="b-tag" style={{ background: "var(--cream)" }}>
-              <span style={{ color: "var(--blue)" }}>◆</span>
-              Auth Backend v1.0
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "6px 14px",
+                background: "#0d1117",
+                border: "2px solid var(--black)",
+                boxShadow: "3px 3px 0 var(--black)",
+                fontFamily: "monospace",
+                fontSize: 13,
+                fontWeight: 600,
+                letterSpacing: "0.01em",
+              }}
+            >
+              <span style={{ color: "#8b949e" }}>$</span>
+              <span style={{ color: "#79c0ff" }}>npx</span>
+              <span style={{ color: "#e6edf3" }}> redauth </span>
+              <span style={{ color: "#a5d6ff" }}>my-new-app</span>
             </span>
           </div>
 
@@ -317,22 +469,20 @@ function HeroSection() {
 
           {/* CTAs */}
           <div className="anim-hidden anim-slide-up delay-400" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 28 }}>
-            <Link href="/signup">
-              <button className="btn btn-blue btn-lg">
-                Start Building →
+            <button className="btn btn-blue btn-lg" onClick={onOpenModal}>
+              Use Template
+            </button>
+            <Link href="/login">
+              <button className="btn btn-cream btn-lg">
+                View Demo
               </button>
             </Link>
-            <a href="#features">
-              <button className="btn btn-cream btn-lg">
-                Explore Features
-              </button>
-            </a>
           </div>
 
           {/* Stats row */}
           <div
             className="anim-hidden anim-slide-up delay-500"
-            style={{ display: "flex", gap: 18, flexWrap: "wrap" }}
+            style={{ display: "flex", gap: 36, flexWrap: "wrap" }}
           >
             {[
               { num: "10+", label: "Core Features" },
@@ -354,7 +504,7 @@ function HeroSection() {
         {/* Right: code snippet */}
         <div
           className="code-snippet-float anim-hidden anim-slide-left delay-600"
-          style={{ position: "relative", width: "clamp(220px, 27vw, 310px)", flexShrink: 0 }}
+          style={{ position: "relative", width: "clamp(300px, 38vw, 440px)", flexShrink: 0, marginTop: 60 }}
         >
           <div className="b-card" style={{ padding: 0, overflow: "hidden", boxShadow: "6px 6px 0 var(--black)" }}>
             {/* Window chrome */}
@@ -369,33 +519,36 @@ function HeroSection() {
                 <div key={c} style={{ width: 10, height: 10, borderRadius: "50%", background: c }} />
               ))}
               <span style={{ marginLeft: 8, color: "#888", fontSize: 12, fontFamily: "monospace" }}>
-                server.ts
+                auth.service.ts
               </span>
             </div>
             <pre style={{
               padding: "16px",
-              fontSize: 11,
-              lineHeight: 1.7,
+              fontSize: 11.5,
+              lineHeight: 1.75,
               fontFamily: "monospace",
               background: "#0d1117",
               color: "#e6edf3",
               overflowX: "auto",
               margin: 0,
             }}
-              dangerouslySetInnerHTML={{ __html: `<span style="color:#ff7b72">import</span> <span style="color:#79c0ff">express</span> from <span style="color:#a5d6ff">"express"</span>;
-<span style="color:#ff7b72">import</span> { <span style="color:#79c0ff">authRouter</span> } from <span style="color:#a5d6ff">"./routes"</span>;
-<span style="color:#ff7b72">import</span> { <span style="color:#79c0ff">rateLimiter</span> } from <span style="color:#a5d6ff">"./middleware"</span>;
-<span style="color:#ff7b72">import</span> { <span style="color:#79c0ff">startCronJobs</span> } from <span style="color:#a5d6ff">"./cron"</span>;
-
-<span style="color:#ff7b72">const</span> app = <span style="color:#79c0ff">express</span>();
-
-app.<span style="color:#d2a8ff">use</span>(rateLimiter);
-app.<span style="color:#d2a8ff">use</span>(<span style="color:#a5d6ff">"/auth"</span>, authRouter);
-
-<span style="color:#79c0ff">startCronJobs</span>();
-
-app.<span style="color:#d2a8ff">listen</span>(<span style="color:#79c0ff">PORT</span>);
-<span style="color:#8b949e">// ✓ Ready for production</span>` }}
+              dangerouslySetInnerHTML={{ __html: `<span style="color:#ff7b72">let</span> <span style="color:#e6edf3">response</span> = <span style="color:#ff7b72">await</span> <span style="color:#79c0ff">prisma</span>.<span style="color:#d2a8ff">$transaction</span>(<span style="color:#ff7b72">async</span> (<span style="color:#e6edf3">tx</span>) =&gt; {
+  <span style="color:#ff7b72">const</span> <span style="color:#e6edf3">newUser</span> = <span style="color:#ff7b72">await</span> <span style="color:#e6edf3">tx</span>.<span style="color:#79c0ff">user</span>.<span style="color:#d2a8ff">create</span>({
+    <span style="color:#a5d6ff">data</span>: {
+      <span style="color:#e6edf3">name</span>,
+      <span style="color:#e6edf3">email</span>,
+      <span style="color:#e6edf3">password</span>: <span style="color:#79c0ff">hashedPassword</span>,
+    },
+  });
+  <span style="color:#ff7b72">const</span> <span style="color:#e6edf3">deviceName</span> = <span style="color:#d2a8ff">getDevice</span>(<span style="color:#e6edf3">req</span>);
+  <span style="color:#ff7b72">const</span> <span style="color:#e6edf3">tokens</span> = <span style="color:#ff7b72">await</span> <span style="color:#79c0ff">tokenService</span>.<span style="color:#d2a8ff">generateTokens</span>(
+    { <span style="color:#e6edf3">id</span>: <span style="color:#e6edf3">newUser</span>.<span style="color:#79c0ff">id</span>, <span style="color:#e6edf3">email</span> },
+    <span style="color:#e6edf3">device</span>,
+    <span style="color:#e6edf3">deviceName</span>,
+    <span style="color:#e6edf3">tx</span>,
+  );
+  <span style="color:#ff7b72">return</span> { <span style="color:#e6edf3">user</span>: <span style="color:#e6edf3">newUser</span>, <span style="color:#e6edf3">tokens</span> };
+});` }}
             />
           </div>
 
@@ -614,7 +767,7 @@ function HowItWorksSection() {
   const { ref, inView } = useInView();
 
   const steps = [
-    { num: "01", title: "Clone & Configure", desc: "Clone the repo, copy .env.example, fill in your database URL and secrets.", color: "var(--pink)" },
+    { num: "01", title: "Run One Command", desc: "Run `npx redauth my-new-app` in your terminal — the full backend scaffolds in seconds.", color: "var(--pink)" },
     { num: "02", title: "Run Migrations", desc: "Run `npx prisma migrate deploy` to apply the PostgreSQL schema in seconds.", color: "var(--sky)" },
     { num: "03", title: "Start Building", desc: "All auth, queues, and cron jobs are pre-wired. Just write your business logic.", color: "var(--cream)" },
   ];
@@ -685,7 +838,7 @@ function HowItWorksSection() {
   );
 }
 
-function CTASection() {
+function CTASection({ onOpenModal }: { onOpenModal: () => void }) {
   const { ref, inView } = useInView();
 
   return (
@@ -730,7 +883,7 @@ function CTASection() {
             transition: "opacity 0.6s ease, transform 0.6s ease",
           }}
         >
-          Ready to Skip the Setup?
+          Ready to Ship?
         </h2>
         <p style={{
           color: "rgba(255,255,255,0.85)",
@@ -744,14 +897,12 @@ function CTASection() {
           email verification, token rotation, and rate limiting firsthand.
         </p>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-          <Link href="/signup">
-            <button className="btn btn-white btn-lg">
-              Create Demo Account →
-            </button>
-          </Link>
+          <button className="btn btn-white btn-lg" onClick={onOpenModal}>
+            Use Template
+          </button>
           <Link href="/login">
             <button className="btn btn-pink btn-lg">
-              Sign In
+              View Demo
             </button>
           </Link>
         </div>
@@ -796,15 +947,20 @@ function Footer() {
 }
 
 export default function LandingPage() {
+  const [showModal, setShowModal] = useState(false);
+  const openModal = useCallback(() => setShowModal(true), []);
+  const closeModal = useCallback(() => setShowModal(false), []);
+
   return (
     <main>
       <Navbar />
-      <HeroSection />
+      <HeroSection onOpenModal={openModal} />
       <FeaturesSection />
       <TechStackSection />
       <HowItWorksSection />
-      <CTASection />
+      <CTASection onOpenModal={openModal} />
       <Footer />
+      {showModal && <TemplateModal onClose={closeModal} />}
     </main>
   );
 }

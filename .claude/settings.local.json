@@ -7,7 +7,10 @@
       "Bash(npx tsc:*)",
       "Bash(ls:*)",
       "Bash(cp \"c:/Users/Noman/Desktop/coding files/1. backends/basicfrontend/public/logo.png\" \"c:/Users/Noman/Desktop/coding files/1. backends/basicfrontend/app/icon.png\")",
-      "Bash(cp \"c:/Users/Noman/Desktop/coding files/1. backends/basicfrontend/public/logo.png\" \"c:/Users/Noman/Desktop/coding files/1. backends/basicfrontend/app/apple-icon.png\")"
+      "Bash(cp \"c:/Users/Noman/Desktop/coding files/1. backends/basicfrontend/public/logo.png\" \"c:/Users/Noman/Desktop/coding files/1. backends/basicfrontend/app/apple-icon.png\")",
+      "Bash(find 'C:\\\\Users\\\\Noman\\\\Desktop\\\\coding files\\\\1. backends\\\\basicfrontend/src' -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))",
+      "Bash(find 'C:\\\\Users\\\\Noman\\\\Desktop\\\\coding files\\\\1. backends\\\\basicfrontend/app' -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))",
+      "Bash(find 'C:\\\\Users\\\\Noman\\\\Desktop\\\\coding files\\\\1. backends\\\\basicfrontend/lib' -type f \\\\\\(-name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js \\\\\\))"
     ]
   }
 }
