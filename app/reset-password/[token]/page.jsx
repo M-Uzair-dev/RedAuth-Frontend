@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { apiFetch, ApiError } from "../../../lib/api";
 
-function getPasswordStrength(password: string): { score: number; label: string; color: string } {
+function getPasswordStrength(password) {
   if (!password) return { score: 0, label: "", color: "#eee" };
   let score = 0;
   if (password.length >= 8) score++;
@@ -19,20 +20,23 @@ function getPasswordStrength(password: string): { score: number; label: string; 
 }
 
 export default function ResetPasswordPage() {
-  const router = useRouter();
+  const params = useParams();
+  const token = params.token;
+
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [errors, setErrors] = useState<{ new?: string; confirm?: string }>({});
-  const [touched, setTouched] = useState<{ new?: boolean; confirm?: boolean }>({});
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+  const [generalError, setGeneralError] = useState("");
 
   const strength = getPasswordStrength(newPassword);
 
   function validate() {
-    const e: typeof errors = {};
+    const e = {};
     if (!newPassword) e.new = "New password is required.";
     else if (newPassword.length < 8) e.new = "Must be at least 8 characters.";
     if (!confirmPassword) e.confirm = "Please confirm your password.";
@@ -40,23 +44,35 @@ export default function ResetPasswordPage() {
     return e;
   }
 
-  function handleBlur(field: "new" | "confirm") {
+  function handleBlur(field) {
     setTouched((t) => ({ ...t, [field]: true }));
     const errs = validate();
     setErrors((prev) => ({ ...prev, [field]: errs[field] }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const errs = validate();
     setTouched({ new: true, confirm: true });
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setErrors({});
+    setGeneralError("");
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await apiFetch("/auth/resetPassword", {
+        method: "POST",
+        body: JSON.stringify({ token, newPassword }),
+      });
       setSuccess(true);
-    }, 2000);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setGeneralError(err.message);
+      } else {
+        setGeneralError("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -120,9 +136,9 @@ export default function ResetPasswordPage() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 16, color: "white",
             boxShadow: "2px 2px 0 var(--black)",
-          }}>N</div>
+          }}>R</div>
           <span style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 18, color: "var(--black)" }}>
-            NodeStack
+            RedAuth
           </span>
         </Link>
         <Link href="/login">
@@ -144,7 +160,6 @@ export default function ResetPasswordPage() {
 
           {!success ? (
             <div className="b-card" style={{ padding: "40px 36px", boxShadow: "8px 8px 0 var(--black)" }}>
-              {/* Icon */}
               <div style={{
                 width: 64, height: 64,
                 background: "var(--pink)",
@@ -157,7 +172,6 @@ export default function ResetPasswordPage() {
                 🔐
               </div>
 
-              {/* Badge */}
               <div style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -189,6 +203,23 @@ export default function ResetPasswordPage() {
               <p style={{ color: "#666", fontSize: 15, lineHeight: 1.6, marginBottom: 28 }}>
                 Choose a strong password to secure your account. It must be at least 8 characters.
               </p>
+
+              {/* General error */}
+              {generalError && (
+                <div style={{
+                  background: "#fff1f1",
+                  border: "2px solid #cc0000",
+                  padding: "12px 16px",
+                  marginBottom: 20,
+                  fontFamily: "Space Grotesk",
+                  fontWeight: 600,
+                  fontSize: 14,
+                  color: "#cc0000",
+                  boxShadow: "3px 3px 0 #cc0000",
+                }}>
+                  {generalError}
+                </div>
+              )}
 
               <form onSubmit={handleSubmit} noValidate>
                 {/* New password */}
@@ -230,14 +261,12 @@ export default function ResetPasswordPage() {
                     </button>
                   </div>
 
-                  {/* Strength meter */}
                   {newPassword && (
                     <div style={{ marginTop: 8 }}>
                       <div style={{ display: "flex", gap: 4, marginBottom: 4 }}>
                         {[1, 2, 3, 4].map((level) => (
                           <div key={level} style={{
-                            flex: 1,
-                            height: 4,
+                            flex: 1, height: 4,
                             border: "1px solid var(--black)",
                             background: strength.score >= level ? strength.color : "#eee",
                             transition: "background 0.3s",
@@ -294,7 +323,6 @@ export default function ResetPasswordPage() {
                     </button>
                   </div>
 
-                  {/* Match indicator */}
                   {confirmPassword && (
                     <p style={{
                       fontSize: 12, marginTop: 6, fontWeight: 600, fontFamily: "Space Grotesk",
@@ -308,7 +336,6 @@ export default function ResetPasswordPage() {
                   )}
                 </div>
 
-                {/* Submit */}
                 <button
                   type="submit"
                   className="btn btn-pink"

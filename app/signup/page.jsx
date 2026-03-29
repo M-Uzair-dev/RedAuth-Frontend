@@ -3,8 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { apiFetch, extractFieldErrors, ApiError } from "../../lib/api";
+import { getDeviceId } from "../../lib/device";
 
-function getPasswordStrength(password: string): { score: number; label: string; color: string } {
+function getPasswordStrength(password) {
   if (!password) return { score: 0, label: "", color: "#eee" };
   let score = 0;
   if (password.length >= 8) score++;
@@ -12,7 +14,6 @@ function getPasswordStrength(password: string): { score: number; label: string; 
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
-
   if (score <= 1) return { score: 1, label: "Weak", color: "#e00" };
   if (score === 2) return { score: 2, label: "Fair", color: "#f90" };
   if (score === 3) return { score: 3, label: "Good", color: "#44ACFF" };
@@ -26,13 +27,13 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
-  const [touched, setTouched] = useState<{ name?: boolean; email?: boolean; password?: boolean }>({});
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
 
   const strength = getPasswordStrength(password);
 
   function validate() {
-    const e: typeof errors = {};
+    const e = {};
     if (!name.trim()) e.name = "Name is required.";
     else if (name.trim().length < 2) e.name = "Name must be at least 2 characters.";
     if (!email) e.email = "Email is required.";
@@ -42,23 +43,39 @@ export default function SignupPage() {
     return e;
   }
 
-  function handleBlur(field: "name" | "email" | "password") {
+  function handleBlur(field) {
     setTouched((t) => ({ ...t, [field]: true }));
     const errs = validate();
     setErrors((prev) => ({ ...prev, [field]: errs[field] }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const errs = validate();
     setTouched({ name: true, email: true, password: true });
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setErrors({});
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await apiFetch("/auth/signup", {
+        method: "POST",
+        body: JSON.stringify({ name, email, password, device: getDeviceId() }),
+      });
       router.push("/dashboard");
-    }, 2000);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const fieldErrors = extractFieldErrors(err);
+        if (Object.keys(fieldErrors).length > 0) {
+          setErrors(fieldErrors);
+        } else {
+          setErrors({ general: err.message });
+        }
+      } else {
+        setErrors({ general: "An unexpected error occurred. Please try again." });
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -114,9 +131,9 @@ export default function SignupPage() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 16, color: "white",
             boxShadow: "2px 2px 0 var(--black)",
-          }}>N</div>
+          }}>R</div>
           <span style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 18, color: "var(--black)" }}>
-            NodeStack
+            RedAuth
           </span>
         </Link>
         <span style={{ fontFamily: "Space Grotesk", fontWeight: 600, fontSize: 13, color: "#666" }}>
@@ -137,10 +154,7 @@ export default function SignupPage() {
         position: "relative",
         zIndex: 1,
       }}>
-        <div
-          className="anim-hidden anim-pop-in"
-          style={{ width: "100%", maxWidth: 480 }}
-        >
+        <div className="anim-hidden anim-pop-in" style={{ width: "100%", maxWidth: 480 }}>
           <div className="b-card" style={{ padding: "40px 36px", boxShadow: "8px 8px 0 var(--black)" }}>
             {/* Header */}
             <div style={{ marginBottom: 32 }}>
@@ -169,12 +183,29 @@ export default function SignupPage() {
                 lineHeight: 1.1,
                 marginBottom: 6,
               }}>
-                Join NodeStack.
+                Join RedAuth.
               </h1>
               <p style={{ color: "#666", fontSize: 15 }}>
                 Create your account and explore the demo.
               </p>
             </div>
+
+            {/* General error */}
+            {errors.general && (
+              <div style={{
+                background: "#fff1f1",
+                border: "2px solid #cc0000",
+                padding: "12px 16px",
+                marginBottom: 20,
+                fontFamily: "Space Grotesk",
+                fontWeight: 600,
+                fontSize: 14,
+                color: "#cc0000",
+                boxShadow: "3px 3px 0 #cc0000",
+              }}>
+                {errors.general}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} noValidate>
               {/* Name */}
@@ -302,12 +333,7 @@ export default function SignupPage() {
                         }} />
                       ))}
                     </div>
-                    <p style={{
-                      fontSize: 12,
-                      fontFamily: "Space Grotesk",
-                      fontWeight: 600,
-                      color: strength.color,
-                    }}>
+                    <p style={{ fontSize: 12, fontFamily: "Space Grotesk", fontWeight: 600, color: strength.color }}>
                       Password strength: {strength.label}
                     </p>
                   </div>
@@ -324,12 +350,7 @@ export default function SignupPage() {
                 type="submit"
                 className="btn btn-pink"
                 disabled={loading}
-                style={{
-                  width: "100%",
-                  justifyContent: "center",
-                  fontSize: 16,
-                  padding: "14px 24px",
-                }}
+                style={{ width: "100%", justifyContent: "center", fontSize: 16, padding: "14px 24px" }}
               >
                 {loading ? (
                   <>
@@ -342,10 +363,7 @@ export default function SignupPage() {
               </button>
             </form>
 
-            <div style={{
-              margin: "24px 0",
-              display: "flex", alignItems: "center", gap: 12,
-            }}>
+            <div style={{ margin: "24px 0", display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ flex: 1, height: 2, background: "var(--black)" }} />
               <span style={{ fontFamily: "Space Grotesk", fontWeight: 600, fontSize: 12, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em" }}>or</span>
               <div style={{ flex: 1, height: 2, background: "var(--black)" }} />

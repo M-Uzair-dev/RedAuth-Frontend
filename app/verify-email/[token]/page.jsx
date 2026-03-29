@@ -2,18 +2,32 @@
 
 import { useState } from "react";
 import Link from "next/link";
-
-type State = "idle" | "verifying" | "success" | "error";
+import { useParams } from "next/navigation";
+import { apiFetch, ApiError } from "../../../lib/api";
 
 export default function VerifyEmailPage() {
-  const [state, setState] = useState<State>("idle");
+  const params = useParams();
+  const token = params.token;
 
-  function handleVerify() {
+  const [state, setState] = useState("idle"); // "idle" | "verifying" | "success" | "error"
+  const [errorMessage, setErrorMessage] = useState("");
+
+  async function handleVerify() {
     setState("verifying");
-    setTimeout(() => {
-      // Simulate: valid token -> success
+    try {
+      await apiFetch("/auth/verifyEmail", {
+        method: "POST",
+        body: JSON.stringify({ token }),
+      });
       setState("success");
-    }, 2200);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setErrorMessage(err.message);
+      } else {
+        setErrorMessage("An unexpected error occurred. Please try again.");
+      }
+      setState("error");
+    }
   }
 
   return (
@@ -77,9 +91,9 @@ export default function VerifyEmailPage() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 16, color: "white",
             boxShadow: "2px 2px 0 var(--black)",
-          }}>N</div>
+          }}>R</div>
           <span style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 18, color: "var(--black)" }}>
-            NodeStack
+            RedAuth
           </span>
         </Link>
         <Link href="/login">
@@ -197,10 +211,8 @@ export default function VerifyEmailPage() {
                 Checking your token with the server.
               </p>
 
-              {/* Progress bar */}
               <div style={{
-                marginTop: 32,
-                height: 6,
+                marginTop: 32, height: 6,
                 background: "#eee",
                 border: "2px solid var(--black)",
                 overflow: "hidden",
@@ -258,7 +270,7 @@ export default function VerifyEmailPage() {
                 You&apos;re all set!
               </h2>
               <p style={{ color: "#555", fontSize: 15, lineHeight: 1.65, marginBottom: 28 }}>
-                Your email has been verified. You now have full access to your NodeStack account.
+                Your email has been verified. You now have full access to your RedAuth account.
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -292,10 +304,10 @@ export default function VerifyEmailPage() {
               </div>
 
               <h2 style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: "1.7rem", letterSpacing: "-0.02em", marginBottom: 12, color: "#cc0000" }}>
-                Invalid Token
+                Verification Failed
               </h2>
               <p style={{ color: "#555", fontSize: 15, lineHeight: 1.65, marginBottom: 28 }}>
-                This verification link is invalid or has expired. Request a new one from your dashboard.
+                {errorMessage || "This verification link is invalid or has expired. Request a new one from your dashboard."}
               </p>
 
               <Link href="/login">

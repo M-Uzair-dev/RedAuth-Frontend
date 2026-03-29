@@ -2,66 +2,67 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 const FEATURES = [
   {
     icon: "🔑",
     title: "Token Management",
-    desc: "JWT access & refresh tokens with automatic rotation, blacklisting, and secure storage.",
+    desc: "Dual JWT (access + refresh) with automatic rotation, instant Redis revocation, and replay-attack theft detection that nukes all sessions.",
     color: "var(--pink)",
   },
   {
     icon: "⚡",
     title: "Rate Limiting",
-    desc: "Per-route, per-user rate limiting with Redis backing. Protect your API from abuse.",
+    desc: "Redis sliding-window rate limiting with per-route tiers — general, strict auth, and stricter email limits.",
     color: "var(--sky)",
   },
   {
     icon: "🗄️",
-    title: "Smart Caching",
-    desc: "Multi-layer caching strategy with cache invalidation, TTL management, and cache warming.",
+    title: "Redis Caching",
+    desc: "Redis user cache with Zod-validated reads/writes and instant invalidation on logout or account update.",
     color: "var(--cream)",
   },
   {
     icon: "⏰",
     title: "Cron Jobs",
-    desc: "Scheduled tasks for automatic token cleanup, email retries, and database maintenance.",
+    desc: "Scheduled token cleanup runs every 10 minutes — expired records purged automatically from the database.",
     color: "var(--pink)",
   },
   {
     icon: "📨",
     title: "Message Queues",
-    desc: "Background email sending with retry logic, dead letter queues, and job prioritization.",
+    desc: "BullMQ async email delivery, concurrency 5, 3 retries with exponential backoff, and orphaned token cleanup on final failure.",
     color: "var(--sky)",
   },
   {
     icon: "📧",
     title: "Email Service",
-    desc: "Transactional emails — verification, password reset, welcome messages — all queued.",
+    desc: "HTML email templates for verification, login alerts, and password reset — all dispatched via BullMQ queue.",
     color: "var(--cream)",
   },
   {
     icon: "🛡️",
-    title: "Zod Validation",
-    desc: "Runtime type safety at every endpoint. Schema-first validation with detailed error messages.",
+    title: "Zod v4 Validation",
+    desc: "Schema-first validation on every endpoint with detailed error messages. Runtime type safety throughout.",
     color: "var(--pink)",
   },
   {
     icon: "🐘",
     title: "Prisma ORM",
-    desc: "Type-safe database queries with PostgreSQL. Migrations, relations, and transactions built-in.",
+    desc: "Type-safe PostgreSQL queries via Prisma 7 with pg pool adapter. Migrations and indexed relations included.",
     color: "var(--sky)",
   },
   {
     icon: "🔐",
     title: "Session Management",
-    desc: "Multi-device session tracking with revocation, device fingerprinting, and active session lists.",
+    desc: "Device-scoped sessions — one refresh token per device, multiple concurrent sessions, per-session revocation.",
     color: "var(--cream)",
   },
   {
-    icon: "🚦",
-    title: "Middleware Stack",
-    desc: "Auth middleware, CORS, helmet, compression, and request logging — all pre-configured.",
+    icon: "⏱️",
+    title: "Timing-Attack Safe",
+    desc: "Constant-time mitigations on all sensitive endpoints — login, forgot password, resend email — preventing user enumeration.",
     color: "var(--pink)",
   },
 ];
@@ -147,16 +148,15 @@ function Navbar() {
         {/* Logo */}
         <Link href="/" style={{ textDecoration: "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 36, height: 36,
-              background: "var(--blue)",
-              border: "2px solid var(--black)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 18, color: "white",
-              boxShadow: "3px 3px 0 var(--black)",
-            }}>N</div>
+            <Image
+              src="/logo.png"
+              alt="RedAuth logo"
+              width={36}
+              height={36}
+              style={{ border: "2px solid var(--black)", boxShadow: "3px 3px 0 var(--black)", display: "block" }}
+            />
             <span style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 20, color: "var(--black)", letterSpacing: "-0.02em" }}>
-              NodeStack
+              RedAuth
             </span>
           </div>
         </Link>
@@ -252,7 +252,7 @@ function HeroSection() {
           <div className="anim-hidden anim-slide-down" style={{ marginBottom: 18 }}>
             <span className="b-tag" style={{ background: "var(--cream)" }}>
               <span style={{ color: "var(--blue)" }}>◆</span>
-              Backend Template v1.0
+              Auth Backend v1.0
             </span>
           </div>
 
@@ -262,7 +262,7 @@ function HeroSection() {
             style={{
               fontFamily: "Space Grotesk",
               fontWeight: 800,
-              fontSize: "clamp(1.7rem, 3.8vw, 3.2rem)",
+              fontSize: "clamp(1.6rem, 3.3vw, 2.75rem)",
               lineHeight: 1.05,
               letterSpacing: "-0.03em",
               marginBottom: 8,
@@ -288,7 +288,7 @@ function HeroSection() {
             style={{
               fontFamily: "Space Grotesk",
               fontWeight: 800,
-              fontSize: "clamp(1.7rem, 3.8vw, 3.2rem)",
+              fontSize: "clamp(1.6rem, 3.3vw, 2.75rem)",
               lineHeight: 1.05,
               letterSpacing: "-0.03em",
               marginBottom: 20,
@@ -302,7 +302,7 @@ function HeroSection() {
           <p
             className="anim-hidden anim-slide-up delay-300"
             style={{
-              fontSize: "clamp(0.88rem, 1.7vw, 1rem)",
+              fontSize: "clamp(0.85rem, 1.45vw, 0.93rem)",
               lineHeight: 1.7,
               color: "#333",
               maxWidth: 520,
@@ -310,13 +310,13 @@ function HeroSection() {
               fontWeight: 400,
             }}
           >
-            A production-grade Node.js backend with JWT auth, rate limiting, caching,
-            cron jobs, message queues, email service, Zod validation, and Prisma ORM.
-            Ship faster, scale confidently.
+            A production-ready Express + TypeScript authentication backend. Device-aware sessions,
+            dual-token JWT with theft detection, Redis rate limiting &amp; caching, BullMQ queues,
+            and Zod v4 validation — all pre-wired. Drop it in and build on top.
           </p>
 
           {/* CTAs */}
-          <div className="anim-hidden anim-slide-up delay-400" style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 36 }}>
+          <div className="anim-hidden anim-slide-up delay-400" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 28 }}>
             <Link href="/signup">
               <button className="btn btn-blue btn-lg">
                 Start Building →
@@ -332,7 +332,7 @@ function HeroSection() {
           {/* Stats row */}
           <div
             className="anim-hidden anim-slide-up delay-500"
-            style={{ display: "flex", gap: 24, flexWrap: "wrap" }}
+            style={{ display: "flex", gap: 18, flexWrap: "wrap" }}
           >
             {[
               { num: "10+", label: "Core Features" },
@@ -615,7 +615,7 @@ function HowItWorksSection() {
 
   const steps = [
     { num: "01", title: "Clone & Configure", desc: "Clone the repo, copy .env.example, fill in your database URL and secrets.", color: "var(--pink)" },
-    { num: "02", title: "Run Migrations", desc: "Run `prisma migrate dev` to set up your PostgreSQL schema in seconds.", color: "var(--sky)" },
+    { num: "02", title: "Run Migrations", desc: "Run `npx prisma migrate deploy` to apply the PostgreSQL schema in seconds.", color: "var(--sky)" },
     { num: "03", title: "Start Building", desc: "All auth, queues, and cron jobs are pre-wired. Just write your business logic.", color: "var(--cream)" },
   ];
 
@@ -740,8 +740,8 @@ function CTASection() {
           opacity: inView ? 1 : 0,
           transition: "opacity 0.6s ease 0.15s",
         }}>
-          Try the live demo — see token management, sessions, email verification,
-          and rate limiting all in one place.
+          Try the live demo — register an account and experience device-aware sessions,
+          email verification, token rotation, and rate limiting firsthand.
         </p>
         <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
           <Link href="/signup">
@@ -774,24 +774,21 @@ function Footer() {
         flexWrap: "wrap", gap: 20,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 30, height: 30,
-            background: "var(--blue)",
-            border: "2px solid white",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 16, color: "white",
-          }}>N</div>
-          <span style={{ fontFamily: "Space Grotesk", fontWeight: 700, fontSize: 16 }}>NodeStack</span>
+          <Image
+            src="/logo.png"
+            alt="RedAuth logo"
+            width={30}
+            height={30}
+            style={{ border: "2px solid white", display: "block" }}
+          />
+          <span style={{ fontFamily: "Space Grotesk", fontWeight: 700, fontSize: 16 }}>RedAuth</span>
         </div>
         <p style={{ color: "#666", fontSize: 14, fontFamily: "Space Grotesk" }}>
-          Built for developers who ship.
+          By <span style={{ color: "#aaa" }}>Uzair Manan</span> — built for developers who ship.
         </p>
         <div style={{ display: "flex", gap: 20 }}>
-          {["GitHub", "Docs", "Issues"].map((link) => (
-            <a key={link} href="#" style={{ color: "#888", fontSize: 14, fontFamily: "Space Grotesk", fontWeight: 600, textDecoration: "none" }}>
-              {link}
-            </a>
-          ))}
+          <a href="https://github.com/M-Uzair-dev/Authetication-Template" target="_blank" rel="noreferrer" style={{ color: "#888", fontSize: 14, fontFamily: "Space Grotesk", fontWeight: 600, textDecoration: "none" }}>GitHub</a>
+          <a href="https://github.com/M-Uzair-dev/Authetication-Template/issues" target="_blank" rel="noreferrer" style={{ color: "#888", fontSize: 14, fontFamily: "Space Grotesk", fontWeight: 600, textDecoration: "none" }}>Issues</a>
         </div>
       </div>
     </footer>

@@ -3,17 +3,22 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { apiFetch, ApiError } from "../../lib/api";
+import { getDeviceId } from "../../lib/device";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface Session {
   id: string;
-  device: string;
-  os: string;
-  browser: string;
-  location: string;
-  lastActive: string;
-  isCurrent: boolean;
-  ip: string;
+  deviceName: string | null;
+  lastActive: string | null;
+  current: boolean;
+}
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
 }
 
 interface ModalConfig {
@@ -21,7 +26,7 @@ interface ModalConfig {
   message: string;
   confirmLabel: string;
   confirmColor: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
 }
 
 interface Toast {
@@ -30,12 +35,18 @@ interface Toast {
   color: string;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const MOCK_SESSIONS: Session[] = [
-  { id: "s1", device: "MacBook Pro", os: "macOS Sonoma", browser: "Chrome 123", location: "New York, US", lastActive: "Active now", isCurrent: true, ip: "203.0.113.1" },
-  { id: "s2", device: "iPhone 15 Pro", os: "iOS 17.4", browser: "Safari Mobile", location: "New York, US", lastActive: "2 hours ago", isCurrent: false, ip: "203.0.113.2" },
-  { id: "s3", device: "Windows PC", os: "Windows 11", browser: "Firefox 124", location: "London, UK", lastActive: "Yesterday", isCurrent: false, ip: "198.51.100.5" },
-];
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function formatLastActive(iso: string | null): string {
+  if (!iso) return "Never";
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Active now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
 
 // ─── Components ───────────────────────────────────────────────────────────────
 function ConfirmModal({ config, onClose }: { config: ModalConfig; onClose: () => void }) {
@@ -68,7 +79,7 @@ function ConfirmModal({ config, onClose }: { config: ModalConfig; onClose: () =>
             Cancel
           </button>
           <button
-            onClick={() => { config.onConfirm(); onClose(); }}
+            onClick={() => { onClose(); config.onConfirm(); }}
             className="btn"
             style={{
               flex: 1,
@@ -144,8 +155,8 @@ function SkeletonProfile() {
 }
 
 // ─── Session icon ──────────────────────────────────────────────────────────────
-function DeviceIcon({ device }: { device: string }) {
-  const d = device.toLowerCase();
+function DeviceIcon({ device }: { device: string | null }) {
+  const d = (device ?? "").toLowerCase();
   const isPhone = d.includes("iphone") || d.includes("android") || d.includes("mobile");
   const isTablet = d.includes("ipad") || d.includes("tablet");
 
@@ -166,34 +177,41 @@ function DeviceIcon({ device }: { device: string }) {
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
   const [tab, setTab] = useState<"sessions" | "profile" | "security">("sessions");
-  const [emailVerified] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSent, setResendSent] = useState(false);
   const [modal, setModal] = useState<ModalConfig | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [toastId, setToastId] = useState(0);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   // Sessions
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessions, setSessions] = useState<Session[]>([]);
 
-  // Profile
-  const [profileLoading, setProfileLoading] = useState(true);
+  // Profile form
   const [name, setName] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
-  const [profileName, setProfileName] = useState("Alex Johnson");
 
   // Password
-  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showCurrentPass, setShowCurrentPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({});
+
+  // Auth guard — load user, redirect to /login if not authenticated
+  useEffect(() => {
+    apiFetch("/user/me")
+      .then((data) => {
+        setUser(data.data.user);
+        setName(data.data.user.name);
+        setAuthChecked(true);
+      })
+      .catch(() => router.replace("/login"));
+  }, [router]);
 
   const addToast = useCallback((message: string, color = "var(--sky)") => {
     const id = toastId + 1;
@@ -205,75 +223,100 @@ export default function DashboardPage() {
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
 
-  // Load sessions
+  // Load sessions once auth is confirmed
   useEffect(() => {
-    const t = setTimeout(() => {
-      setSessions(MOCK_SESSIONS);
-      setSessionsLoading(false);
-    }, 1600);
-    return () => clearTimeout(t);
-  }, []);
+    if (!authChecked) return;
+    setSessionsLoading(true);
+    apiFetch(`/user/sessions?device=${getDeviceId()}`)
+      .then((data) => setSessions(data.data.sessions))
+      .catch(() => setSessions([]))
+      .finally(() => setSessionsLoading(false));
+  }, [authChecked]);
 
-  // Load profile
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setName("Alex Johnson");
-      setProfileLoading(false);
-    }, 1200);
-    return () => clearTimeout(t);
-  }, []);
-
-  function handleResendVerification() {
+  async function handleResendVerification() {
+    if (!user) return;
     setResendLoading(true);
-    setTimeout(() => {
-      setResendLoading(false);
+    try {
+      await apiFetch("/auth/resendVerificationEmail", {
+        method: "POST",
+        body: JSON.stringify({ email: user.email, device: getDeviceId() }),
+      });
       setResendSent(true);
       addToast("✉️ Verification email sent!", "var(--sky)");
       setTimeout(() => setResendSent(false), 8000);
-    }, 1800);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Failed to send email.";
+      addToast(`❌ ${msg}`, "#fff1f1");
+    } finally {
+      setResendLoading(false);
+    }
   }
 
   function handleRevokeSession(session: Session) {
     setModal({
       title: "Revoke Session",
-      message: `Are you sure you want to revoke the session on "${session.device}" (${session.location})? That device will be signed out immediately.`,
+      message: `Revoke the session on "${session.deviceName ?? "Unknown device"}"? That device will be signed out immediately.`,
       confirmLabel: "Revoke Access",
       confirmColor: "#cc0000",
-      onConfirm: () => {
-        setSessions((prev) => prev.filter((s) => s.id !== session.id));
-        addToast(`Session on ${session.device} has been revoked.`, "var(--cream)");
+      onConfirm: async () => {
+        try {
+          await apiFetch("/user/revoke-session", {
+            method: "POST",
+            body: JSON.stringify({ tokenId: session.id }),
+          });
+          setSessions((prev) => prev.filter((s) => s.id !== session.id));
+          addToast(`Session revoked.`, "var(--cream)");
+        } catch (err) {
+          const msg = err instanceof ApiError ? err.message : "Failed to revoke session.";
+          addToast(`❌ ${msg}`, "#fff1f1");
+        }
       },
     });
   }
 
   function handleRevokeAll() {
     setModal({
-      title: "Revoke All Other Sessions",
-      message: "This will sign out all devices except your current one. This action cannot be undone.",
-      confirmLabel: "Revoke All",
+      title: "Sign Out All Devices",
+      message: "This will invalidate all sessions on all devices including this one. You will be redirected to login.",
+      confirmLabel: "Sign Out All",
       confirmColor: "#cc0000",
-      onConfirm: () => {
-        setSessions((prev) => prev.filter((s) => s.isCurrent));
-        addToast("All other sessions have been revoked.", "var(--cream)");
+      onConfirm: async () => {
+        try {
+          await apiFetch("/auth/logout-all", {
+            method: "POST",
+            body: JSON.stringify({ device: getDeviceId() }),
+          });
+        } finally {
+          router.replace("/login");
+        }
       },
     });
   }
 
   function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) { addToast("Name cannot be empty.", "#fff1f1"); return; }
+    if (!name.trim()) { addToast("❌ Name cannot be empty.", "#fff1f1"); return; }
     setModal({
       title: "Save Profile Changes",
       message: `Update your display name to "${name.trim()}"?`,
       confirmLabel: "Save Changes",
       confirmColor: "var(--blue)",
-      onConfirm: () => {
+      onConfirm: async () => {
         setProfileSaving(true);
-        setTimeout(() => {
-          setProfileName(name.trim());
-          setProfileSaving(false);
+        try {
+          const data = await apiFetch("/user/me", {
+            method: "PATCH",
+            body: JSON.stringify({ name: name.trim() }),
+          });
+          setUser(data.data.user);
+          setName(data.data.user.name);
           addToast("✅ Profile updated successfully!", "var(--sky)");
-        }, 1200);
+        } catch (err) {
+          const msg = err instanceof ApiError ? err.message : "Failed to update profile.";
+          addToast(`❌ ${msg}`, "#fff1f1");
+        } finally {
+          setProfileSaving(false);
+        }
       },
     });
   }
@@ -281,30 +324,40 @@ export default function DashboardPage() {
   function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!currentPassword) errs.current = "Current password is required.";
     if (!newPassword) errs.new = "New password is required.";
     else if (newPassword.length < 8) errs.new = "Must be at least 8 characters.";
     if (!confirmPassword) errs.confirm = "Please confirm your password.";
     else if (newPassword !== confirmPassword) errs.confirm = "Passwords do not match.";
-    if (newPassword === currentPassword && currentPassword) errs.new = "New password must differ from current.";
     setPasswordErrors(errs);
     if (Object.keys(errs).length > 0) return;
 
     setModal({
       title: "Change Password",
-      message: "Are you sure you want to update your password? You will remain signed in.",
+      message: "This will sign you out of all devices. You'll need to log in again everywhere.",
       confirmLabel: "Update Password",
       confirmColor: "var(--blue)",
-      onConfirm: () => {
+      onConfirm: async () => {
         setPasswordSaving(true);
-        setTimeout(() => {
-          setCurrentPassword("");
-          setNewPassword("");
-          setConfirmPassword("");
-          setPasswordErrors({});
+        try {
+          await apiFetch("/auth/change-password", {
+            method: "POST",
+            body: JSON.stringify({ newPassword, confirmPassword }),
+          });
+          router.replace("/login");
+        } catch (err) {
+          const e = err instanceof ApiError ? err : null;
+          if (e?.type === "VALIDATION_ERROR" && e.details?.length) {
+            const fieldErrs: Record<string, string> = {};
+            for (const d of e.details) {
+              if (d.field === "newPassword") fieldErrs.new = d.message;
+              else if (d.field === "confirmPassword") fieldErrs.confirm = d.message;
+            }
+            setPasswordErrors(fieldErrs);
+          } else {
+            addToast(`❌ ${e?.message ?? "Failed to change password."}`, "#fff1f1");
+          }
           setPasswordSaving(false);
-          addToast("🔒 Password changed successfully!", "var(--sky)");
-        }, 1500);
+        }
       },
     });
   }
@@ -315,15 +368,43 @@ export default function DashboardPage() {
       message: "Are you sure you want to sign out of your current session?",
       confirmLabel: "Sign Out",
       confirmColor: "#cc0000",
-      onConfirm: () => router.push("/login"),
+      onConfirm: async () => {
+        try {
+          await apiFetch("/auth/logout", {
+            method: "POST",
+            body: JSON.stringify({ device: getDeviceId() }),
+          });
+        } finally {
+          router.replace("/login");
+        }
+      },
     });
   }
+
+  const emailVerified = user?.emailVerified ?? false;
 
   const tabs = [
     { key: "sessions", label: "Active Sessions", icon: "🖥️" },
     { key: "profile", label: "Profile", icon: "👤" },
     { key: "security", label: "Security", icon: "🔒" },
   ] as const;
+
+  if (!authChecked) {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "white",
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <div style={{
+          width: 48, height: 48,
+          border: "4px solid var(--black)",
+          borderTopColor: "transparent",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+        }} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8f8f8", display: "flex", flexDirection: "column" }}>
@@ -373,9 +454,9 @@ export default function DashboardPage() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 17, color: "white",
             boxShadow: "2px 2px 0 var(--black)",
-          }}>N</div>
+          }}>R</div>
           <span style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 18, color: "var(--black)" }}>
-            NodeStack
+            RedAuth
           </span>
         </Link>
 
@@ -395,10 +476,10 @@ export default function DashboardPage() {
               display: "flex", alignItems: "center", justifyContent: "center",
               fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 13,
             }}>
-              {profileName.charAt(0).toUpperCase()}
+              {(user?.name ?? "?").charAt(0).toUpperCase()}
             </div>
             <span style={{ fontFamily: "Space Grotesk", fontWeight: 700, fontSize: 14, color: "var(--black)" }}>
-              {profileName}
+              {user?.name ?? ""}
             </span>
           </div>
           <button onClick={handleLogout} className="btn btn-white btn-sm">
@@ -477,7 +558,7 @@ export default function DashboardPage() {
                   Devices currently signed in to your account.
                 </p>
               </div>
-              {!sessionsLoading && sessions.filter((s) => !s.isCurrent).length > 0 && (
+              {!sessionsLoading && sessions.filter((s) => !s.current).length > 0 && (
                 <button onClick={handleRevokeAll} className="btn btn-white btn-sm">
                   Revoke All Others
                 </button>
@@ -502,48 +583,53 @@ export default function DashboardPage() {
                       alignItems: "flex-start",
                       gap: 16,
                       flexWrap: "wrap",
-                      background: session.isCurrent ? "rgba(137, 212, 255, 0.08)" : "white",
+                      background: "white",
                       transition: "background 0.2s",
                     }}
                   >
-                    <DeviceIcon device={session.device} />
+                    <DeviceIcon device={session.deviceName} />
 
                     <div style={{ flex: 1, minWidth: 200 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                         <span style={{ fontFamily: "Space Grotesk", fontWeight: 700, fontSize: 15 }}>
-                          {session.device}
+                          {session.deviceName ?? "Unknown device"}
                         </span>
-                        {session.isCurrent && (
+                        {session.current && (
                           <span style={{
                             background: "var(--sky)",
                             border: "2px solid var(--black)",
-                            padding: "1px 8px",
+                            padding: "1px 7px",
                             fontFamily: "Space Grotesk",
                             fontWeight: 700,
                             fontSize: 11,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.06em",
+                            color: "var(--black)",
+                            lineHeight: 1.6,
                           }}>
-                            Current
+                            This device
                           </span>
                         )}
                       </div>
-                      <p style={{ fontSize: 13, color: "#555", marginBottom: 3 }}>
-                        {session.os} · {session.browser}
-                      </p>
-                      <p style={{ fontSize: 13, color: "#888" }}>
-                        {session.location} · {session.ip}
-                      </p>
-                      <p style={{ fontSize: 12, color: "#999", marginTop: 4, fontFamily: "Space Grotesk", fontWeight: 600 }}>
-                        {session.lastActive === "Active now" ? (
+                      <p style={{ fontSize: 12, color: "#999", fontFamily: "Space Grotesk", fontWeight: 600 }}>
+                        {formatLastActive(session.lastActive) === "Active now" ? (
                           <span style={{ color: "#22c55e" }}>● Active now</span>
                         ) : (
-                          `Last active: ${session.lastActive}`
+                          `Last active: ${formatLastActive(session.lastActive)}`
                         )}
                       </p>
                     </div>
 
-                    {!session.isCurrent && (
+                    {session.current ? (
+                      <span style={{
+                        fontSize: 12,
+                        fontFamily: "Space Grotesk",
+                        fontWeight: 600,
+                        color: "#888",
+                        flexShrink: 0,
+                        alignSelf: "center",
+                      }}>
+                        Current
+                      </span>
+                    ) : (
                       <button
                         onClick={() => handleRevokeSession(session)}
                         className="btn btn-sm"
@@ -599,14 +685,14 @@ export default function DashboardPage() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 24,
                 }}>
-                  {profileName.charAt(0).toUpperCase()}
+                  {(user?.name ?? "?").charAt(0).toUpperCase()}
                 </div>
                 <div>
                   <h2 style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: "1.2rem", marginBottom: 2 }}>
-                    {profileName}
+                    {user?.name ?? ""}
                   </h2>
                   <p style={{ fontSize: 13, color: "#333" }}>
-                    demo@nodestack.dev
+                    {user?.email ?? ""}
                     {!emailVerified && (
                       <span style={{
                         marginLeft: 8,
@@ -627,7 +713,7 @@ export default function DashboardPage() {
 
               {/* Form */}
               <div style={{ padding: "28px" }}>
-                {profileLoading ? (
+                {!user ? (
                   <SkeletonProfile />
                 ) : (
                   <form onSubmit={handleSaveProfile}>
@@ -668,7 +754,7 @@ export default function DashboardPage() {
                       </label>
                       <input
                         type="email"
-                        value="demo@nodestack.dev"
+                        value={user?.email ?? ""}
                         className="b-input"
                         style={{
                           maxWidth: 400,
@@ -680,14 +766,14 @@ export default function DashboardPage() {
                         readOnly
                       />
                       <p style={{ fontSize: 12, color: "#888", marginTop: 4, fontFamily: "Space Grotesk" }}>
-                        Email address cannot be changed in demo mode.
+                        Email address cannot be changed.
                       </p>
                     </div>
 
                     <button
                       type="submit"
                       className="btn btn-pink"
-                      disabled={profileSaving || name.trim() === profileName}
+                      disabled={profileSaving || name.trim() === (user?.name ?? "")}
                     >
                       {profileSaving ? <><span className="spinner" style={{ marginRight: 8 }} />Saving...</> : "Save Changes"}
                     </button>
@@ -720,41 +806,6 @@ export default function DashboardPage() {
 
               <div style={{ padding: "28px" }}>
                 <form onSubmit={handleChangePassword}>
-                  {/* Current password */}
-                  <div style={{ marginBottom: 18 }}>
-                    <label style={{
-                      display: "block",
-                      fontFamily: "Space Grotesk",
-                      fontWeight: 700,
-                      fontSize: 13,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.06em",
-                      marginBottom: 6,
-                    }}>
-                      Current Password <span style={{ color: "#e00" }}>*</span>
-                    </label>
-                    <div style={{ position: "relative", maxWidth: 400 }}>
-                      <input
-                        type={showCurrentPass ? "text" : "password"}
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        className="b-input"
-                        style={{
-                          paddingRight: 48,
-                          borderColor: passwordErrors.current ? "#cc0000" : "var(--black)",
-                          boxShadow: passwordErrors.current ? "4px 4px 0 var(--black)" : undefined,
-                        }}
-                        placeholder="••••••••"
-                        disabled={passwordSaving}
-                        autoComplete="current-password"
-                      />
-                      <button type="button" onClick={() => setShowCurrentPass(!showCurrentPass)} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#666" }}>
-                        {showCurrentPass ? "🙈" : "👁️"}
-                      </button>
-                    </div>
-                    {passwordErrors.current && <p style={{ color: "#cc0000", fontSize: 13, marginTop: 4, fontWeight: 500 }}>↳ {passwordErrors.current}</p>}
-                  </div>
-
                   {/* New password */}
                   <div style={{ marginBottom: 18 }}>
                     <label style={{
@@ -877,7 +928,16 @@ export default function DashboardPage() {
                       message: "This will invalidate all your sessions on all devices, including this one. You will be redirected to the login page.",
                       confirmLabel: "Sign Out Everywhere",
                       confirmColor: "#cc0000",
-                      onConfirm: () => router.push("/login"),
+                      onConfirm: async () => {
+                        try {
+                          await apiFetch("/auth/logout-all", {
+                            method: "POST",
+                            body: JSON.stringify({ device: getDeviceId() }),
+                          });
+                        } finally {
+                          router.replace("/login");
+                        }
+                      },
                     })}
                     className="btn btn-sm"
                     style={{ background: "#fff1f1", borderColor: "#cc0000", color: "#cc0000", boxShadow: "3px 3px 0 var(--black)", flexShrink: 0 }}

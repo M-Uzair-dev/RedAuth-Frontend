@@ -349,13 +349,13 @@ h6 {
 }
 
 .btn-lg {
-  padding: 16px 32px;
-  font-size: 17px;
-  box-shadow: 6px 6px 0 var(--black);
+  padding: 13px 26px;
+  font-size: 15px;
+  box-shadow: 5px 5px 0 var(--black);
 }
 
 .btn-lg:hover {
-  box-shadow: 8px 8px 0 var(--black);
+  box-shadow: 7px 7px 0 var(--black);
 }
 
 /* Brutalist input */

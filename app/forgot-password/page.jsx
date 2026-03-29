@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { apiFetch, ApiError } from "../../lib/api";
+import { getDeviceId } from "../../lib/device";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -16,17 +18,30 @@ export default function ForgotPasswordPage() {
     return "";
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setTouched(true);
     const err = validate();
     if (err) { setError(err); return; }
     setError("");
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await apiFetch("/auth/forgotPassword", {
+        method: "POST",
+        body: JSON.stringify({ email, device: getDeviceId() }),
+      });
       setSent(true);
-    }, 2000);
+    } catch (err) {
+      // The API always returns success for this endpoint (prevents enumeration),
+      // so any real error here is a network/rate-limit issue.
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -66,26 +81,23 @@ export default function ForgotPasswordPage() {
         position: "relative",
         zIndex: 10,
       }}>
-        <Link href="/login" style={{
-          textDecoration: "none",
-          fontFamily: "Space Grotesk",
-          fontWeight: 700,
-          fontSize: 14,
-          color: "var(--black)",
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "6px 10px",
-          border: "2px solid var(--black)",
-          boxShadow: "2px 2px 0 var(--black)",
-          transition: "transform 0.08s, box-shadow 0.08s",
-        }}
+        <Link href="/login"
           className="btn btn-white btn-sm"
+          style={{
+            textDecoration: "none",
+            fontFamily: "Space Grotesk",
+            fontWeight: 700,
+            fontSize: 14,
+            color: "var(--black)",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
         >
           ← Back to Login
         </Link>
         <span style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 18, color: "var(--black)" }}>
-          NodeStack
+          RedAuth
         </span>
       </div>
 
@@ -102,7 +114,6 @@ export default function ForgotPasswordPage() {
         <div className="anim-hidden anim-pop-in" style={{ width: "100%", maxWidth: 440 }}>
           {!sent ? (
             <div className="b-card" style={{ padding: "40px 36px", boxShadow: "8px 8px 0 var(--black)" }}>
-              {/* Lock icon */}
               <div style={{
                 width: 64, height: 64,
                 background: "var(--cream)",
@@ -147,6 +158,23 @@ export default function ForgotPasswordPage() {
                 No worries — enter your email below and we&apos;ll send you a reset link right away.
               </p>
 
+              {/* Error banner */}
+              {touched && error && (
+                <div style={{
+                  background: "#fff1f1",
+                  border: "2px solid #cc0000",
+                  padding: "12px 16px",
+                  marginBottom: 20,
+                  fontFamily: "Space Grotesk",
+                  fontWeight: 600,
+                  fontSize: 14,
+                  color: "#cc0000",
+                  boxShadow: "3px 3px 0 #cc0000",
+                }}>
+                  {error}
+                </div>
+              )}
+
               <form onSubmit={handleSubmit} noValidate>
                 <div style={{ marginBottom: 24 }}>
                   <label style={{
@@ -180,11 +208,6 @@ export default function ForgotPasswordPage() {
                     autoComplete="email"
                     disabled={loading}
                   />
-                  {touched && error && (
-                    <p style={{ color: "#cc0000", fontSize: 13, marginTop: 4, fontWeight: 500 }}>
-                      ↳ {error}
-                    </p>
-                  )}
                 </div>
 
                 <button
@@ -207,7 +230,6 @@ export default function ForgotPasswordPage() {
           ) : (
             /* Success state */
             <div className="b-card anim-pop-in" style={{ padding: "48px 36px", textAlign: "center", boxShadow: "8px 8px 0 var(--black)" }}>
-              {/* Success icon */}
               <div style={{
                 width: 80, height: 80,
                 background: "var(--sky)",

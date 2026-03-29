@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { apiFetch, extractFieldErrors, ApiError } from "../../lib/api";
+import { getDeviceId } from "../../lib/device";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,32 +12,48 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
-  const [touched, setTouched] = useState<{ email?: boolean; password?: boolean }>({});
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
 
   function validate() {
-    const e: typeof errors = {};
+    const e = {};
     if (!email) e.email = "Email is required.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = "Enter a valid email address.";
     if (!password) e.password = "Password is required.";
-    else if (password.length < 6) e.password = "Password must be at least 6 characters.";
+    else if (password.length < 8) e.password = "Password must be at least 8 characters.";
     return e;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const errs = validate();
     setTouched({ email: true, password: true });
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setErrors({});
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password, device: getDeviceId() }),
+      });
       router.push("/dashboard");
-    }, 2000);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const fieldErrors = extractFieldErrors(err);
+        if (Object.keys(fieldErrors).length > 0) {
+          setErrors(fieldErrors);
+        } else {
+          setErrors({ general: err.message });
+        }
+      } else {
+        setErrors({ general: "An unexpected error occurred. Please try again." });
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleBlur(field: "email" | "password") {
+  function handleBlur(field) {
     setTouched((t) => ({ ...t, [field]: true }));
     const errs = validate();
     setErrors((prev) => ({ ...prev, [field]: errs[field] }));
@@ -86,9 +104,9 @@ export default function LoginPage() {
             display: "flex", alignItems: "center", justifyContent: "center",
             fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 16, color: "white",
             boxShadow: "2px 2px 0 var(--black)",
-          }}>N</div>
+          }}>R</div>
           <span style={{ fontFamily: "Space Grotesk", fontWeight: 800, fontSize: 18, color: "var(--black)" }}>
-            NodeStack
+            RedAuth
           </span>
         </Link>
         <span style={{ fontFamily: "Space Grotesk", fontWeight: 600, fontSize: 13, color: "#666" }}>
@@ -109,14 +127,7 @@ export default function LoginPage() {
         position: "relative",
         zIndex: 1,
       }}>
-        <div
-          className="anim-hidden anim-pop-in"
-          style={{
-            width: "100%",
-            maxWidth: 460,
-          }}
-        >
-          {/* Card */}
+        <div className="anim-hidden anim-pop-in" style={{ width: "100%", maxWidth: 460 }}>
           <div className="b-card" style={{ padding: "40px 36px", boxShadow: "8px 8px 0 var(--black)" }}>
             {/* Header */}
             <div style={{ marginBottom: 32 }}>
@@ -271,13 +282,7 @@ export default function LoginPage() {
                 type="submit"
                 className="btn btn-blue"
                 disabled={loading}
-                style={{
-                  width: "100%",
-                  justifyContent: "center",
-                  fontSize: 16,
-                  padding: "14px 24px",
-                  position: "relative",
-                }}
+                style={{ width: "100%", justifyContent: "center", fontSize: 16, padding: "14px 24px" }}
               >
                 {loading ? (
                   <>
@@ -291,10 +296,7 @@ export default function LoginPage() {
             </form>
 
             {/* Divider */}
-            <div style={{
-              margin: "24px 0",
-              display: "flex", alignItems: "center", gap: 12,
-            }}>
+            <div style={{ margin: "24px 0", display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ flex: 1, height: 2, background: "var(--black)" }} />
               <span style={{ fontFamily: "Space Grotesk", fontWeight: 600, fontSize: 12, color: "#888", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                 or
@@ -309,17 +311,6 @@ export default function LoginPage() {
               </Link>
             </p>
           </div>
-
-          {/* Bottom note */}
-          <p style={{
-            textAlign: "center",
-            fontSize: 12,
-            color: "#999",
-            marginTop: 16,
-            fontFamily: "Space Grotesk",
-          }}>
-            This is a demo. Use any email & password.
-          </p>
         </div>
       </div>
     </div>
