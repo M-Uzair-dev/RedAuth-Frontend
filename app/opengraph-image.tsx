@@ -105,7 +105,7 @@ export default function OgImage() {
                 padding: "2px 14px",
                 border: "2.5px solid white",
                 boxShadow: "4px 4px 0 rgba(255,107,157,0.6)",
-                display: "inline-flex",
+                display: "flex",
               }}
             >
               the Boilerplate.

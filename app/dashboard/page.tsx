@@ -205,7 +205,7 @@ export default function DashboardPage() {
   // Auth guard — load user, redirect to /login if not authenticated
   useEffect(() => {
     apiFetch("/user/me")
-      .then((data) => {
+      .then((data: any) => {
         setUser(data.data.user);
         setName(data.data.user.name);
         setAuthChecked(true);
@@ -228,7 +228,7 @@ export default function DashboardPage() {
     if (!authChecked) return;
     setSessionsLoading(true);
     apiFetch(`/user/sessions?device=${getDeviceId()}`)
-      .then((data) => setSessions(data.data.sessions))
+      .then((data: any) => setSessions(data.data.sessions))
       .catch(() => setSessions([]))
       .finally(() => setSessionsLoading(false));
   }, [authChecked]);
@@ -304,7 +304,7 @@ export default function DashboardPage() {
       onConfirm: async () => {
         setProfileSaving(true);
         try {
-          const data = await apiFetch("/user/me", {
+          const data: any = await apiFetch("/user/me", {
             method: "PATCH",
             body: JSON.stringify({ name: name.trim() }),
           });
